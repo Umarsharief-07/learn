@@ -1,0 +1,75 @@
+pipeline {
+    agent any
+    environment {
+        SCANNER_HOME=tool 'sonar-scanner' // make sure enable tools in jenkins for sonar 
+    }
+    stages {
+        stage("checkout") {
+            steps {
+                git branch: 'main', url: 'https://github.com/Umarsharief-07/learn.git'
+            }
+        }
+        stage('SonarQube Analysis') {
+            steps {
+                script {
+                    
+                    withSonarQubeEnv('Sonar-scanner') { // give the creds in credentidals > global credentials > select secret key > paste and use the same in credes
+                        sh """
+                            $SCANNER_HOME/bin/sonar-scanner \
+                           -Dsonar.projectKey=node \
+                           -Dsonar.sources=. 
+                           """
+                    }
+                }
+            }
+        }
+        
+        stage("Image remove") {
+            steps {
+                sh 'sudo chmod 777 /var/run/docker.sock'
+                sh '''
+                #!/bin/bash
+                if docker images | grep -q new:n ; then   
+                # Stop and remove any containers using the image 'new:n'
+                docker ps -a --filter "ancestor=new:n" -q | xargs -r docker stop
+                docker ps -a --filter "ancestor=new:n" -q | xargs -r docker rm
+                docker rmi new:n || true
+                else
+                   echo "no image found"
+                fi
+                '''
+            }
+        }
+
+        stage("docker build") {
+            steps {
+                sh '''
+                sudo usermod -aG docker jenkins
+                docker build -t new:n .
+                '''
+            }
+        }
+
+        stage("docker run") {
+            steps {
+                sh 'docker stop jer || true && docker rm jer || true'
+                sh 'docker run -d --name jer -p 2001:3000 new:n'
+            }
+        }
+
+        stage("docker push") {
+            steps {
+                withDockerRegistry(credentialsId: 'DOC_CRED', url: 'https://index.docker.io/v1/') {
+                    sh "docker tag new:n umarsharief07/ultimate-cicd:${BUILD_NUMBER}"
+                    sh "docker push umarsharief07/ultimate-cicd:${BUILD_NUMBER}"
+                }
+            }
+        }
+    
+    }
+    post{
+        always{
+            cleanWs()
+        }
+    }
+}
