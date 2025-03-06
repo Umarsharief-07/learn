@@ -1,7 +1,7 @@
 pipeline {
     agent any
     environment {
-        SCANNER_HOME=tool 'sonar-scanner' // make sure enable tools in jenkins for sonar 
+        SCANNER_HOME=tool 'sonar-scanner' //  manage jenkins > tools > SonarQube Scanner installations > give name  (sonar-scanner)
     }
     stages {
         stage("checkout") {
